@@ -23,8 +23,8 @@ body.active {
 
 @media only screen and (min-width: 769px) {
     header {
-        display: block !important;
-        position: relative;
+        display: none !important;
+        
     }
     #lead-down {
         display: block !important;
@@ -46,12 +46,12 @@ body.active {
 }
 
 header {
-    position: absolute; /* Esto permite que el menú se superponga sobre el contenido */
+    position: fixed; /* Esto permite que el menú se superponga sobre el contenido */
     top: 0;
     left: 0;
     width: 100%;
     background-color: transparent; /* Quita el color de fondo */
-    z-index: 10; /* Asegúrate de que esté en un nivel superior */
+    z-index: 999; /* Asegúrate de que esté en un nivel superior */
 }
 
 /* Fondo Oscuro */
