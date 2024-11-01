@@ -18,25 +18,7 @@ Mi objetivo es contribuir al crecimiento y la eficiencia de las organizaciones u
 - **Lenguajes y Herramientas**:
   - Python, SQL, SPSS
   - Microsoft Excel, Power BI, Office 365
-
-- **Habilidades Adicionales**:
-  - Marketing Digital
-  - Análisis de Datos y Business Intelligence con Power BI
-
-## Proyectos Destacados
-
-1. **Optimización de Portafolio de Activos del S&P 500**
-   - Utilicé el modelo de media-varianza de Harry Markowitz para optimizar un portafolio de inversiones, maximizando el rendimiento y minimizando el riesgo.
-   - **Habilidades**: Python, Análisis Financiero, Optimización de Portafolios
-
-2. **Modelo Predictivo de Aprobación de Préstamos**
-   - Desarrollo de un sistema predictivo para la aprobación de préstamos utilizando modelos de machine learning como Árbol de Decisión y Bosque Aleatorio.
-   - **Habilidades**: Python, Machine Learning, Análisis de Datos
-
-3. **Análisis de Estados Financieros de Gemini Electronics**
-   - Análisis detallado de los estados financieros de Gemini Electronics, evaluando su eficiencia, liquidez, solvencia y rentabilidad, con recomendaciones estratégicas.
-   - **Habilidades**: Análisis Financiero, Estrategia Empresarial
-
+  
 ## Educación
 
 - **Licenciatura en Ingeniería Financiera**  
@@ -51,7 +33,8 @@ Mi objetivo es contribuir al crecimiento y la eficiencia de las organizaciones u
 
 - **Portafolio**: [angeljavierpl.github.io/portafolio](https://angeljavierpl.github.io/portafolio/)
 - **LinkedIn**: [linkedin.com/in/angeljavierpl](http://www.linkedin.com/in/angeljavierpl)
+- **Instagram**: [[linkedin.com/in/angeljavierpl](https://www.instagram.com/angeljavierpl/)]
 
 ## Contacto
 
-Si deseas comunicarte conmigo, puedes enviarme un correo electrónico a **angeljavi1609@gmail.com** o visitar mi LinkedIn. También puedes explorar más detalles en mi portafolio y CV.
+Si deseas comunicarte conmigo, puedes enviarme un correo electrónico a **angeljavi1609@gmail.com**, llamar al **1-829-694-0022** o visitar mi LinkedIn.
