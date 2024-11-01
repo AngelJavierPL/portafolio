@@ -7,7 +7,7 @@
 
 Bienvenido a mi portafolio de proyectos, donde muestro una selección de mis trabajos y habilidades en el ámbito de la **Ingeniería Financiera** y **Análisis de Datos**. Actualmente soy estudiante en el Instituto Tecnológico de Santo Domingo (INTEC), y estoy enfocado en aplicar herramientas analíticas y tecnológicas para mejorar la eficiencia y crecimiento de las organizaciones.
 
-Este portafolio incluye proyectos en los que he trabajado, los cuales demuestran mis competencias en **análisis financiero**, **optimización de portafolios**, y **modelos predictivos**, entre otros.
+Este portafolio incluye proyectos en los que he trabajado, los cuales demuestran mis competencias en **análisis financiero**, **optimización de portafolios**, **modelos predictivos**, entre otros.
 
 ## Objetivo Profesional
 
