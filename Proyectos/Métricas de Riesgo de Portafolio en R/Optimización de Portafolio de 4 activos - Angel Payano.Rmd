@@ -1,0 +1,222 @@
+---
+title: "Análisis de Portafolio de 4 activos del S&P 500"
+author: "Angel Javier Payano Lanfranco - ID: 1113788"
+date: "`r Sys.Date()`"
+output:
+  
+  word_document: default
+  toc: true
+  number_sections: true
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Este análisis tiene como objetivo construir y optimizar un portafolio de inversión utilizando R. Para ello, se descargan datos mensuales de 4 activos del S&P 500 y del índice de mercado (\^GSPC) desde Yahoo Finance, junto con la tasa libre de riesgo (DGS10) desde FRED. Estos datos permiten calcular retornos mensuales y otras métricas relevantes.
+
+El portafolio se optimiza para minimizar la varianza, cumpliendo con restricciones como la suma de pesos igual a 1 y sin posiciones cortas. Además, se evalúan métricas clave de desempeño, como el retorno anualizado, desviación estándar, Beta, CAPM y ratios de Sharpe, Treynor y Sortino. También se incluyen análisis adicionales como el Value at Risk (VaR), Conditional VaR (CVaR), y el máximo Drawdown.
+
+El principal objetivo de este trabajo es proporcionar un análisis claro y estructurado que permita al lector comprender el proceso de construcción y optimización de un portafolio de inversión utilizando herramientas de R. Se busca que cualquier lector pueda no solo interpretar los resultados presentados, sino también replicar y aplicar el análisis por sí mismo con diferentes datos o condiciones.
+
+Adicionalmente, este trabajo tiene como propósito introducir y explicar algunos conceptos fundamentales de gestión de portafolios, como la diversificación, la minimización de riesgo, y el uso de métricas de desempeño (Sharpe Ratio, Beta, VaR, entre otros). De esta manera, se espera que el lector no solo aprenda a implementar estos métodos, sino que también adquiera un entendimiento práctico de cómo evaluar y gestionar un portafolio en la práctica financiera.
+
+# Análisis
+
+## 1. Instalación de librerias necesarias
+
+```{r, message=FALSE, warning=FALSE}
+library(quantmod)
+library(PerformanceAnalytics)
+library(PortfolioAnalytics)
+library(ROI)
+library(ROI.plugin.quadprog)
+```
+
+1.  **`quantmod`**: Permite descargar y manejar datos financieros históricos desde diversas fuentes como Yahoo Finance y FRED.
+
+2.  **`PerformanceAnalytics`**: Proporciona herramientas para analizar el desempeño de activos y portafolios, incluyendo métricas de riesgo y retorno.
+
+3.  **`PortfolioAnalytics`**: Facilita la optimización de portafolios basándose en restricciones y objetivos específicos como minimizar la varianza.
+
+4.  **`ROI`**: Proporciona una infraestructura para resolver problemas de optimización, como la asignación de activos en un portafolio.
+
+5.  **`ROI.plugin.quadprog`**: Extiende ROI para resolver problemas de optimización cuadrática, comúnmente usados en la optimización de portafolios.
+
+## 2. Obtención de datos financieros
+
+```{r}
+symbols <- c("AAPL", "NVDA", "JNJ", "XOM", "^GSPC") # Activos y mercado
+prices_list <- lapply(symbols, function(sym) {
+  try({
+    data <- getSymbols(sym, from = "2022-01-01", to = "2025-01-01", auto.assign = FALSE)
+    adj_close <- Cl(to.monthly(data, indexAt = "lastof", drop.time = TRUE)) # Extraer precios ajustados mensuales
+    colnames(adj_close) <- sym # Renombrar columna con el símbolo
+    adj_close
+  })
+})
+
+# Combinar los datos en un único objeto xts
+prices_xts <- do.call(merge, prices_list)
+
+# Descargar Risk-Free Rate desde FRED ----
+getSymbols("DGS10", src = "FRED", auto.assign = TRUE)
+rfrate_today <- as.numeric(last(na.omit(DGS10))) / 100  # Convertir a decimal
+print(paste("Risk-Free Rate actual (10-Year Treasury Yield):", round(rfrate_today * 100, 2), "%"))
+```
+
+Este código descarga los precios ajustados mensuales de Apple, NVIDIA, Johnson & Johnson, Exxon Mobil y el índice de mercado S&P 500 desde Yahoo Finance. Los datos diarios se convierten a precios mensuales y se extraen los precios ajustados. Luego, todas las series temporales se combinan en un único objeto `xts`. Además, se obtiene la tasa libre de riesgo (rendimiento del bono del Tesoro a 10 años) desde FRED, se procesa el valor más reciente para convertirlo a formato decimal, y se imprime para utilizarlo en cálculos posteriores.
+
+## 3. Cálculo de Retornos
+
+A continuación se calculan los retornos mensuales para los activos de manera individual.
+
+```{r}
+returns <- na.omit(Return.calculate(prices_xts))
+colnames(returns)[colnames(returns) == "X.GSPC"] <- "GSPC"
+market_returns <- returns[, "GSPC"]                      # Retornos del mercado
+asset_returns <- returns[, colnames(returns) != "GSPC"]  # Excluir el mercado
+```
+
+Luego, se realiza una gráfica para observar el desempeño de dichos rendimientos.
+
+```{r}
+charts.PerformanceSummary(asset_returns, main = "Desempeño de Activos Individuales")
+```
+
+En términos de retorno acumulado, NVDA destaca con un crecimiento significativo, superando a los demás activos, mientras que los otros mantienen un crecimiento más estable. Los retornos mensuales reflejan la volatilidad de los activos, siendo NVDA el más volátil, mientras que JNJ parece ser el más estable. En la sección de drawdown, se observan caídas acumuladas más pronunciadas en AAPL y NVDA, lo que indica mayor riesgo bajista en esos activos comparado con JNJ y XOM, que tienen drawdowns más moderados.
+
+## 4. Especificaciones del portafolio
+
+```{r}
+portfolio <- portfolio.spec(assets = colnames(asset_returns))
+
+# Añadir restricciones al portafolio
+portfolio <- add.constraint(portfolio, type = "weight_sum", min_sum = 1, max_sum = 1) # Pesos suman 1
+portfolio <- add.constraint(portfolio, type = "box", min = 0, max = 1) # Pesos no negativos
+
+# Objetivo: Minimización de la varianza
+portfolio <- add.objective(portfolio, type = "risk", name = "StdDev")
+```
+
+En este paso se define el portafolio incluyendo los activos seleccionados y se establecen restricciones clave: los pesos deben sumar 1 (todo el capital está invertido) y deben estar entre 0 y 1 (sin posiciones cortas). El objetivo es minimizar el riesgo, definido como la desviación estándar de los retornos, siguiendo la teoría de portafolio de Harry Markowitz para crear una combinación eficiente y estable de activos.
+
+## 5. Optimización de pesos del portafolio
+
+En este paso se optimiza el portafolio para minimizar el riesgo (desviación estándar de los retornos) utilizando el método ROI y las restricciones previamente definidas. Los pesos óptimos asignados a cada activo se extraen, se imprimen y se visualizan en un gráfico con etiquetas que muestran los valores exactos. Esto permite analizar cómo se distribuye el capital entre los activos seleccionados.
+
+```{r}
+opt_portfolio <- optimize.portfolio(
+  R = asset_returns,
+  portfolio = portfolio,
+  optimize_method = "ROI",
+  trace = TRUE
+)
+
+# Pesos optimizados
+weights_opt <- extractWeights(opt_portfolio)
+chart.Weights(opt_portfolio, main = "Pesos del Portafolio Optimizado")
+text(
+  x = 1:length(weights_opt),          
+  y = weights_opt,                    
+  labels = round(weights_opt, 3),     
+  pos = 3,                            
+  cex = 0.8,                          
+  col = "blue"                        
+)
+
+```
+
+Apple (AAPL) representa aproximadamente el 18.1% del portafolio, mientras que NVIDIA (NVDA) no tiene asignación (peso 0), lo que indica que no contribuye al portafolio debido a su impacto en la varianza. Johnson & Johnson (JNJ) tiene el mayor peso, con un 70.7%, siendo el activo más estable o menos correlacionado con los demás. Por otro lado, Exxon Mobil (XOM) tiene un peso del 11.2%. El portafolio prioriza activos que minimizan el riesgo total, evitando aquellos con alta volatilidad o alta correlación con los demás, como NVIDIA.
+
+## 6. Métricas y visualizaciones de desempeño del portafolio optimizado
+
+La función `portfolio_metrics` calcula métricas clave de desempeño y riesgo del portafolio, como retorno anualizado, volatilidad, Beta, y ratios como Sharpe, Treynor, y Sortino. También evalúa métricas de riesgo como VaR, CVaR y máximo drawdown.
+
+```{r}
+portfolio_metrics <- function(weights, asset_returns, market_returns, risk_free = 0) {
+  port_returns <- rowSums(asset_returns * weights)
+  
+  # Anualización de Retornos
+  port_annual_return <- mean(port_returns) * 12
+  port_sd <- sd(port_returns) * sqrt(12) # Desviación estándar anualizada
+  
+  # Beta
+  port_beta <- sum(weights * apply(asset_returns, 2, function(x) cov(x, market_returns) / var(market_returns)))
+  
+  # Cálculo del CAPM
+  market_annual_return <- mean(market_returns) * 12
+  capm_return <- risk_free + port_beta * (market_annual_return - risk_free)
+  
+  # Sharpe y Treynor
+  sharpe_ratio <- (port_annual_return - risk_free) / port_sd
+  treynor_ratio <- (port_annual_return - risk_free) / port_beta
+  
+  # Métricas adicionales
+  VaR_95 <- quantile(port_returns, probs = 0.05)
+  CVaR_95 <- mean(port_returns[port_returns <= VaR_95])
+  sortino_ratio <- SortinoRatio(port_returns, MAR = risk_free)
+  max_drawdown <- maxDrawdown(port_returns)
+  
+  list(
+    Return = port_annual_return,
+    SD = port_sd,
+    Beta = port_beta,
+    Sharpe = sharpe_ratio,
+    Treynor = treynor_ratio,
+    CAPM = capm_return,
+    VaR = VaR_95,
+    CVaR = CVaR_95,
+    Sortino = sortino_ratio,
+    Drawdown = max_drawdown
+  )
+}
+```
+
+-   **Retorno Anualizado**: Promedio de los retornos mensuales escalado a un año (12 meses).
+
+-   **Desviación Estándar**: Medida de la volatilidad de los retornos del portafolio.
+
+-   **Beta**: Sensibilidad del portafolio frente a los movimientos del mercado.
+
+-   **Sharpe Ratio**: Retorno en exceso por unidad de riesgo total (desviación estándar).
+
+-   **Treynor Ratio**: Retorno en exceso por unidad de riesgo sistemático (Beta).
+
+-   **CAPM (Capital Asset Pricing Model)**: Modelo financiero que estima el retorno esperado de un activo o portafolio considerando su riesgo sistemático (beta), la tasa libre de riesgo y la prima de riesgo del mercado.
+
+-   **Value at Risk (VaR)**: Pérdida máxima esperada en condiciones normales para un nivel de confianza del 95%.
+
+-   **Conditional VaR (CVaR)**: Promedio de las pérdidas que exceden el VaR.
+
+-   **Sortino Ratio**: Retorno en exceso por unidad de riesgo bajista (desviaciones negativas).
+
+-   **Máximo Drawdown**: Mayor caída acumulada del valor del portafolio desde su punto más alto.
+
+```{r, message=FALSE, warning=FALSE}
+metrics_opt <- portfolio_metrics(weights_opt, asset_returns, market_returns, risk_free = rfrate_today)
+print("Métricas del portafolio optimizado:")
+print(metrics_opt)
+```
+
+El portafolio optimizado tiene un retorno anual esperado de **35.42%** con una volatilidad de **31.11%**, lo que refleja un nivel moderado de riesgo. Su **Beta de 0.54** indica que el portafolio es menos sensible a los movimientos del mercado, mientras que un **Sharpe Ratio de 0.99** evidencia un buen equilibrio entre riesgo total y retorno. Según el modelo **CAPM**, el retorno esperado del portafolio sería de **7.87%**, significativamente menor al retorno observado, lo que indica un desempeño superior al estimado por su riesgo sistemático.
+
+En términos de riesgo bajista, el portafolio podría enfrentar pérdidas de hasta **8.51%** en condiciones normales (**VaR**) y un promedio de **12.83%** en escenarios extremos (**CVaR**). El **máximo drawdown** de **19.95%** muestra caídas notables en su valor histórico, y el **Sortino Ratio negativo (-0.27)** indica que el portafolio no está bien protegido contra riesgos bajistas, lo que podría preocupar a inversores conservadores.
+
+```{r}
+charts.PerformanceSummary(
+  xts(rowSums(asset_returns * weights_opt), order.by = index(asset_returns)),
+  main = "Desempeño del Portafolio Optimizado",
+  geometric = TRUE
+)
+```
+
+La gráfica muestra el desempeño del portafolio optimizado. En términos de retorno acumulado, el portafolio presenta un crecimiento constante a lo largo del tiempo, con un aumento notable en 2023. Los retornos mensuales son moderados, pero consistentes, y las caídas (drawdowns) se mantienen por debajo del 15%, indicando un nivel de riesgo controlado y pérdidas relativamente bajas en períodos adversos. Esto sugiere un portafolio bien diversificado y con un buen balance entre retorno y riesgo.
+
+# Conclusión
+
+En este trabajo se presentó un análisis detallado para la construcción y optimización de un portafolio de inversión utilizando herramientas de R. A través de datos financieros reales, se optimizó un portafolio que minimiza la varianza, respetando restricciones de diversificación y evitando posiciones cortas. Las métricas de desempeño y riesgo calculadas demostraron un equilibrio adecuado entre retorno y volatilidad, aunque algunos indicadores sugieren áreas de mejora frente a riesgos bajistas. Este análisis no solo permite replicar el proceso, sino que también proporciona una base sólida para entender conceptos clave de gestión de portafolios, ofreciendo al lector herramientas prácticas para aplicarlas en sus propios análisis financieros.
